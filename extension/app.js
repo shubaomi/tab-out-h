@@ -1570,11 +1570,7 @@ async function renderQuickURLsPanel() {
 
   const items = await getQuickURLs();
 
-  if (items.length === 0) {
-    panel.style.display = 'none';
-    return;
-  }
-
+  // Panel is always visible (collapsed if no items, expanded if items exist)
   panel.style.display = 'block';
   countEl.textContent = `(${items.length})`;
 
