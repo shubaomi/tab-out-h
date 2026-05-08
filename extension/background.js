@@ -161,13 +161,37 @@ async function cleanupClosedTabs() {
   sessionState.lastTargetURL = null;
 }
 
-chrome.tabs.onCreated.addListener(async (tab) => {
-  console.log('[tab-out] onCreated fired, tab.url:', tab.url);
-  // 仅处理 Tab Out 的新标签页（chrome-extension://.../index.html 或 chrome://newtab/）
-  if (!isTabOutPage(tab.url)) {
-    console.log('[tab-out] not a tab-out page, returning early');
+// Track tab IDs of new tab pages (set to chrome-extension://.../index.html)
+// We store IDs when onCreated fires with empty URL, then check on onUpdated
+let pendingTabIds = new Set();
+
+chrome.tabs.onCreated.addListener((tab) => {
+  // New tab opened — url may be empty at this point (Chrome hasn't loaded URL yet)
+  // Store the tab.id so we can recognize it when onUpdated fires with the actual URL
+  pendingTabIds.add(tab.id);
+  console.log('[tab-out] onCreated, tab.id:', tab.id, 'pending count:', pendingTabIds.size);
+});
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  // Only process when the URL is actually set/changed
+  if (changeInfo.url !== undefined) {
+    console.log('[tab-out] onUpdated, tabId:', tabId, 'changeInfo.url:', changeInfo.url);
+  }
+  if (changeInfo.status !== 'complete') return;
+  if (!pendingTabIds.has(tabId)) return;
+
+  const url = tab.url || '';
+  console.log('[tab-out] onUpdated complete, tabId:', tabId, 'url:', url);
+
+  // Check if this is Tab Out's new tab page
+  if (!isTabOutPage(url)) {
+    console.log('[tab-out] not a tab-out URL, removing from pending');
+    pendingTabIds.delete(tabId);
     return;
   }
+
+  // This is a Tab Out new tab page
+  pendingTabIds.delete(tabId);
 
   // 先清理已关闭的 tab（检查上一个 redirect 目标是否仍存在）
   await cleanupClosedTabs();
@@ -176,7 +200,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   const { items } = await chrome.storage.local.get('quickURLs');
   console.log('[tab-out] quickURLs items:', items);
   if (!items || items.length === 0) {
-    console.log('[tab-out] no items or empty, returning early');
+    console.log('[tab-out] no items or empty, returning — show dashboard');
     return; // 无配置，保持 dashboard
   }
 
@@ -184,7 +208,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   const unopened = items.filter(item => !sessionState.openedIDs.includes(item.id));
   console.log('[tab-out] unopened URLs:', unopened, 'openedIDs:', sessionState.openedIDs);
   if (unopened.length === 0) {
-    console.log('[tab-out] all URLs opened, returning early');
+    console.log('[tab-out] all URLs opened, returning — show dashboard');
     return; // 所有 URL 都已打开过 → 保持 dashboard
   }
 
@@ -192,7 +216,7 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   const target = unopened[0];
   sessionState.openedIDs.push(target.id);
   sessionState.lastTargetURL = target.url;
-  console.log('[tab-out] redirecting to:', target.url, 'tab.id:', tab.id);
+  console.log('[tab-out] redirecting to:', target.url, 'tabId:', tabId);
 
-  await redirectTab(tab.id, target.url);
+  await redirectTab(tabId, target.url);
 });
