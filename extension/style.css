@@ -18,6 +18,14 @@
   --status-abandoned: #b35a5a;
   --card-bg: #fffdf9;
   --shadow: rgba(26, 22, 19, 0.06);
+  --border: #e0dbd4;
+  --border-hover: #c8c3bc;
+  --surface-primary: #fffdf9;
+  --surface-secondary: #f4f0ea;
+  --surface-hover: #ece8e2;
+  --text-primary: #1a1613;
+  --text-secondary: #6b635a;
+  --accent: #c8713a;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1155,4 +1163,438 @@ footer { animation: fadeUp 0.5s ease 0.65s both; }
   color: var(--muted);
   opacity: 0.6;
   flex-shrink: 0;
+}
+
+/* ================================================================
+   QUICK URLS PANEL
+   ================================================================ */
+
+.quicks-urls-panel {
+  margin-bottom: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.quicks-urls-panel:hover {
+  border-color: var(--border-hover);
+}
+
+/* Toggle row (always visible) */
+.quicks-urls-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--surface-secondary);
+}
+
+.quicks-chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: transform 0.2s ease-out;
+}
+
+.quicks-urls-panel.expanded .quicks-chevron {
+  transform: rotate(180deg);
+}
+
+.quicks-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.quicks-count {
+  font-family: 'Newsreader', serif;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface-primary);
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  margin-left: 4px;
+}
+
+.quicks-toggle-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quicks-add-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.quicks-add-tab-btn:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.quicks-add-tab-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.quicks-expand-btn {
+  font-size: 12px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+
+.quicks-expand-btn:hover {
+  color: var(--text-primary);
+}
+
+/* Collapsible body */
+.quicks-urls-body {
+  display: none;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--border);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease-out;
+}
+
+.quicks-urls-panel.expanded .quicks-urls-body {
+  display: flex;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.quicks-urls-list {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Empty state */
+.quicks-urls-empty {
+  padding: 20px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Input row */
+.quicks-urls-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-secondary);
+}
+
+.quicks-url-input {
+  flex: 1;
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.quicks-url-input:focus {
+  border-color: var(--accent);
+}
+
+.quicks-url-input::placeholder {
+  color: var(--muted);
+}
+
+.quicks-url-add-btn {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.quicks-url-add-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ================================================================
+   QUICK URL CARD
+   ================================================================ */
+
+.quicks-url-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  position: relative;
+}
+
+.quicks-url-card:hover {
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+.quicks-url-card .drag-handle {
+  color: var(--muted);
+  cursor: grab;
+  font-size: 14px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.quicks-url-card:hover .drag-handle {
+  opacity: 1;
+}
+
+.quicks-url-card .favicon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+
+.quicks-url-card .url-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.quicks-url-card .url-title {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quicks-url-card .url-hostname {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quicks-url-card .url-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-secondary);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  max-width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quicks-url-card .url-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+
+.quicks-url-card:hover .url-delete-btn {
+  opacity: 1;
+}
+
+.quicks-url-card .url-delete-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.quicks-url-card .url-delete-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ================================================================
+   TAB SELECTOR MODAL
+   ================================================================ */
+
+.quicks-tab-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quicks-tab-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.quicks-tab-modal-content {
+  position: relative;
+  width: 480px;
+  max-height: 70vh;
+  background: var(--surface-primary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.quicks-tab-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.quicks-tab-modal-header h3 {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.quicks-tab-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: color 0.12s;
+}
+
+.quicks-tab-modal-close:hover {
+  color: var(--text-primary);
+}
+
+.quicks-tab-modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.quicks-tab-modal-search {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.quicks-tab-search-input {
+  width: 100%;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.quicks-tab-search-input:focus {
+  border-color: var(--accent);
+}
+
+.quicks-tab-list {
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quicks-tab-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.quicks-tab-item:hover {
+  background: var(--surface-hover);
+}
+
+.quicks-tab-item .tab-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.quicks-tab-item .tab-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.quicks-tab-item .tab-title {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quicks-tab-item .tab-url {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
