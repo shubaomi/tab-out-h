@@ -184,7 +184,9 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   console.log('[tab-out] onUpdated complete, tabId:', tabId, 'url:', url);
 
   // Check if this is Tab Out's new tab page
-  if (!isTabOutPage(url)) {
+  const isTabOut = isTabOutPage(url);
+  console.log('[tab-out] isTabOutPage result:', isTabOut, 'for url:', url);
+  if (!isTabOut) {
     console.log('[tab-out] not a tab-out URL, removing from pending');
     pendingTabIds.delete(tabId);
     return;
@@ -197,9 +199,14 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   await cleanupClosedTabs();
 
   // 读取配置
-  const { items } = await chrome.storage.local.get('quickURLs');
-  console.log('[tab-out] storage result:', { items });
+  const stored = await chrome.storage.local.get('quickURLs');
+  const items = stored.quickURLs;
+  console.log('[tab-out] storage raw result:', stored);
+  console.log('[tab-out] items value:', items, 'type:', typeof items, 'isArray:', Array.isArray(items));
   if (!items || items.length === 0) {
+    // 检查 storage 里实际有什么数据
+    const all = await chrome.storage.local.get(null);
+    console.log('[tab-out] ALL storage:', all);
     console.log('[tab-out] no items or empty, returning — show dashboard');
     return; // 无配置，保持 dashboard
   }
