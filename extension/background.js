@@ -173,26 +173,18 @@ chrome.tabs.onCreated.addListener((tab) => {
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  // Only process when the URL is actually set/changed
-  if (changeInfo.url !== undefined) {
-    console.log('[tab-out] onUpdated, tabId:', tabId, 'changeInfo.url:', changeInfo.url);
-  }
   if (changeInfo.status !== 'complete') return;
-  if (!pendingTabIds.has(tabId)) return;
 
   const url = tab.url || '';
-  console.log('[tab-out] onUpdated complete, tabId:', tabId, 'url:', url);
+  const extId = chrome.runtime.id;
 
-  // Check if this is Tab Out's new tab page
-  const isTabOut = isTabOutPage(url);
-  console.log('[tab-out] isTabOutPage result:', isTabOut, 'for url:', url);
-  if (!isTabOut) {
-    console.log('[tab-out] not a tab-out URL, removing from pending');
-    pendingTabIds.delete(tabId);
+  // Only process when the URL is Tab Out's extension page
+  if (!url.startsWith(`chrome-extension://${extId}/index.html`)) {
     return;
   }
 
-  // This is a Tab Out new tab page
+  // Only process tabs that were created by the new tab action (tracked via pendingTabIds)
+  if (!pendingTabIds.has(tabId)) return;
   pendingTabIds.delete(tabId);
 
   // 先清理已关闭的 tab（检查上一个 redirect 目标是否仍存在）
@@ -201,29 +193,16 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   // 读取配置
   const stored = await chrome.storage.local.get('quickURLs');
   const items = stored.quickURLs;
-  console.log('[tab-out] storage raw result:', stored);
-  console.log('[tab-out] items value:', items, 'type:', typeof items, 'isArray:', Array.isArray(items));
-  if (!items || items.length === 0) {
-    // 检查 storage 里实际有什么数据
-    const all = await chrome.storage.local.get(null);
-    console.log('[tab-out] ALL storage:', all);
-    console.log('[tab-out] no items or empty, returning — show dashboard');
-    return; // 无配置，保持 dashboard
-  }
+  if (!items || items.length === 0) return; // 无配置，保持 dashboard
 
   // 动态计算未完成一轮的 URLs
   const unopened = items.filter(item => !sessionState.openedIDs.includes(item.id));
-  console.log('[tab-out] unopened URLs:', unopened, 'openedIDs:', sessionState.openedIDs);
-  if (unopened.length === 0) {
-    console.log('[tab-out] all URLs opened, returning — show dashboard');
-    return; // 所有 URL 都已打开过 → 保持 dashboard
-  }
+  if (unopened.length === 0) return; // 所有 URL 都已打开过 → 保持 dashboard
 
   // redirect 到第一个未打开的 URL
   const target = unopened[0];
   sessionState.openedIDs.push(target.id);
   sessionState.lastTargetURL = target.url;
-  console.log('[tab-out] redirecting to:', target.url, 'tabId:', tabId);
 
   await redirectTab(tabId, target.url);
 });
