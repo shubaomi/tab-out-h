@@ -162,24 +162,37 @@ async function cleanupClosedTabs() {
 }
 
 chrome.tabs.onCreated.addListener(async (tab) => {
+  console.log('[tab-out] onCreated fired, tab.url:', tab.url);
   // 仅处理 Tab Out 的新标签页（chrome-extension://.../index.html 或 chrome://newtab/）
-  if (!isTabOutPage(tab.url)) return;
+  if (!isTabOutPage(tab.url)) {
+    console.log('[tab-out] not a tab-out page, returning early');
+    return;
+  }
 
   // 先清理已关闭的 tab（检查上一个 redirect 目标是否仍存在）
   await cleanupClosedTabs();
 
   // 读取配置
   const { items } = await chrome.storage.local.get('quickURLs');
-  if (!items || items.length === 0) return; // 无配置，保持 dashboard
+  console.log('[tab-out] quickURLs items:', items);
+  if (!items || items.length === 0) {
+    console.log('[tab-out] no items or empty, returning early');
+    return; // 无配置，保持 dashboard
+  }
 
   // 动态计算未完成一轮的 URLs
   const unopened = items.filter(item => !sessionState.openedIDs.includes(item.id));
-  if (unopened.length === 0) return; // 所有 URL 都已打开过 → 保持 dashboard
+  console.log('[tab-out] unopened URLs:', unopened, 'openedIDs:', sessionState.openedIDs);
+  if (unopened.length === 0) {
+    console.log('[tab-out] all URLs opened, returning early');
+    return; // 所有 URL 都已打开过 → 保持 dashboard
+  }
 
   // redirect 到第一个未打开的 URL
   const target = unopened[0];
   sessionState.openedIDs.push(target.id);
   sessionState.lastTargetURL = target.url;
+  console.log('[tab-out] redirecting to:', target.url, 'tab.id:', tab.id);
 
   await redirectTab(tab.id, target.url);
 });
