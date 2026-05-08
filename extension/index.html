@@ -47,6 +47,59 @@
   </div>
 
   <!-- ================================================================
+       QUICK URLS CONFIG PANEL — collapsible panel at top of dashboard
+       ================================================================ -->
+  <div class="quicks-urls-panel" id="quicksUrlsPanel">
+    <div class="quicks-urls-toggle" id="quicksUrlsToggle">
+      <svg class="quicks-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+      </svg>
+      <span class="quicks-label">快捷网址</span>
+      <span class="quicks-count" id="quicksCount"></span>
+      <div class="quicks-toggle-right">
+        <button class="quicks-add-tab-btn" id="quicksAddTabBtn" title="从当前 Tab 添加">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          添加当前 Tab
+        </button>
+        <button class="quicks-expand-btn" id="quicksExpandBtn">展开</button>
+      </div>
+    </div>
+    <div class="quicks-urls-body" id="quicksUrlsBody">
+      <div class="quicks-urls-list" id="quicksUrlsList"></div>
+      <div class="quicks-urls-empty" id="quicksUrlsEmpty" style="display:none">
+        还没有配置网址，试试点击「添加当前 Tab」或下方输入框
+      </div>
+      <div class="quicks-urls-input-row">
+        <input type="url" class="quicks-url-input" id="quicksUrlInput" placeholder="输入网址后按回车添加，如 https://...">
+        <button class="quicks-url-add-btn" id="quicksUrlAddBtn">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       TAB SELECTOR MODAL — popup when adding from current tabs
+       ================================================================ -->
+  <div class="quicks-tab-modal" id="quicksTabModal" style="display:none">
+    <div class="quicks-tab-modal-backdrop" id="quicksTabModalBackdrop"></div>
+    <div class="quicks-tab-modal-content">
+      <div class="quicks-tab-modal-header">
+        <h3>选择要添加的 Tab</h3>
+        <button class="quicks-tab-modal-close" id="quicksTabModalClose">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="quicks-tab-modal-search">
+        <input type="text" class="quicks-tab-search-input" id="quicksTabSearchInput" placeholder="搜索 Tab 标题或网址...">
+      </div>
+      <div class="quicks-tab-list" id="quicksTabList"></div>
+    </div>
+  </div>
+
+  <!-- ================================================================
        MAIN CONTENT AREA — two-column layout
        Left: open tabs (domain/mission cards)
        Right: saved for later checklist
