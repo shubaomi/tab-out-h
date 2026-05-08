@@ -1672,6 +1672,18 @@ function closeTabSelectorModal() {
    ================================================================ */
 
 document.addEventListener('click', async (e) => {
+  // "添加当前 Tab" button — open tab selector modal (check before toggle)
+  if (e.target.closest('#quicksAddTabBtn')) {
+    await openTabSelectorModal();
+    return;
+  }
+
+  // Modal close
+  if (e.target.closest('#quicksTabModalClose') || e.target.closest('#quicksTabModalBackdrop')) {
+    closeTabSelectorModal();
+    return;
+  }
+
   const toggle = e.target.closest('#quicksUrlsToggle');
   const expandBtn = e.target.closest('#quicksExpandBtn');
 
@@ -1688,16 +1700,6 @@ document.addEventListener('click', async (e) => {
       body.style.maxHeight = '0';
       if (expandBtnEl) expandBtnEl.textContent = '展开';
     }
-    return;
-  }
-
-  if (e.target.closest('#quicksAddTabBtn')) {
-    await openTabSelectorModal();
-    return;
-  }
-
-  if (e.target.closest('#quicksTabModalClose') || e.target.closest('#quicksTabModalBackdrop')) {
-    closeTabSelectorModal();
     return;
   }
 
