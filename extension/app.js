@@ -1528,7 +1528,7 @@ async function addQuickURL(url, title) {
   const items = await getQuickURLs();
   if (items.some(item => item.url === url)) return false;
   const newItem = generateQuickURLItem(url, title);
-  items.unshift(newItem);
+  items.push(newItem); // append to end — first added = first in list = first to open
   await saveQuickURLs(items);
   return newItem;
 }

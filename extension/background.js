@@ -14,38 +14,13 @@
  */
 
 // ================================================================
-// SESSION STATE — 仅进程内存，浏览器关闭后重置
+// NEW TAB INTERCEPTOR
+// No session state — always check current real open tabs
 // ================================================================
-let sessionState = {
-  openedIDs: [],      // 本 session 已打开过的 quickURL id 列表
-  lastTargetURL: null // 上一次 redirect 目标 URL
-};
-
-/**
- * isTabOutPage(url)
- * 判断 URL 是否为 Tab Out 自身的新标签页
- */
-function isTabOutPage(url) {
-  if (!url) return false;
-  return url === 'chrome://newtab/' ||
-         url.startsWith('chrome-extension://') && url.endsWith('/index.html');
-}
-
-/**
- * getNextQuickURL(items)
- * 从配置列表中返回下一个应该打开的 URL
- * 规则：从 items 中过滤掉已打开的，取第一个；如果全部已打开，返回 null
- */
-function getNextQuickURL(items) {
-  if (!items || items.length === 0) return null;
-  const unopened = items.filter(item => !sessionState.openedIDs.includes(item.id));
-  if (unopened.length === 0) return null;
-  return unopened[0];
-}
 
 /**
  * redirectTab(tabId, targetURL)
- * 直接用 chrome.tabs.update 跳转到目标 URL（比 executeScript 更早生效）
+ * 直接用 chrome.tabs.update 跳转到目标 URL
  */
 async function redirectTab(tabId, targetURL) {
   try {
@@ -136,73 +111,45 @@ updateBadge();
 
 // ================================================================
 // NEW TAB INTERCEPTOR
+// Always check current real tabs — no session cache needed
 // ================================================================
 
 /**
- * 检查上一个 redirect 目标的 tab 是否仍存在
- * 如果已被用户关闭（tab 不存在），则将其从 openedIDs 移除，使其重新参与循环
+ * Normalize URL for comparison — strip trailing slash
  */
-async function cleanupClosedTabs() {
-  if (!sessionState.lastTargetURL) return;
-
-  const allTabs = await chrome.tabs.query({});
-  const stillOpen = allTabs.some(t => t.url === sessionState.lastTargetURL);
-
-  if (!stillOpen && sessionState.lastTargetURL) {
-    const { items } = await chrome.storage.local.get('quickURLs');
-    if (items) {
-      const matched = items.find(item => item.url === sessionState.lastTargetURL);
-      if (matched) {
-        const idx = sessionState.openedIDs.indexOf(matched.id);
-        if (idx !== -1) sessionState.openedIDs.splice(idx, 1);
-      }
-    }
-  }
-  sessionState.lastTargetURL = null;
+function normalizeUrl(url) {
+  return url ? url.replace(/\/$/, '') : '';
 }
 
-// Track tab IDs of new tab pages (set to chrome-extension://.../index.html)
-// We store IDs when onCreated fires with empty URL, then check on onUpdated
-let pendingTabIds = new Set();
+chrome.tabs.onCreated.addListener(async (tab) => {
+  console.log('[tab-out] onCreated, tab.id:', tab.id);
 
-chrome.tabs.onCreated.addListener((tab) => {
-  // New tab opened — url may be empty at this point (Chrome hasn't loaded URL yet)
-  // Store the tab.id so we can recognize it when onUpdated fires with the actual URL
-  pendingTabIds.add(tab.id);
-  console.log('[tab-out] onCreated, tab.id:', tab.id, 'pending count:', pendingTabIds.size);
-});
+  // Query all currently open tabs
+  const allTabs = await chrome.tabs.query({});
+  const openUrls = new Set(allTabs.map(t => normalizeUrl(t.url)));
+  console.log('[tab-out] openUrls:', [...openUrls]);
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-  if (changeInfo.status !== 'complete') return;
+  // Read quick URL config
+  const stored = await chrome.storage.local.get('quickURLs');
+  const items = stored.quickURLs;
+  console.log('[tab-out] items:', items ? items.length : 0);
 
-  const url = tab.url || '';
-  const extId = chrome.runtime.id;
+  if (!items || items.length === 0) return; // No config — let dashboard load
 
-  // Only process when the URL is Tab Out's extension page
-  if (!url.startsWith(`chrome-extension://${extId}/index.html`)) {
+  // Find the first configured URL that is NOT currently open
+  // Items are ordered — first item = highest priority
+  const target = items.find(item => !openUrls.has(normalizeUrl(item.url)));
+
+  if (!target) {
+    console.log('[tab-out] all quick URLs already open — show dashboard');
     return;
   }
 
-  // Only process tabs that were created by the new tab action (tracked via pendingTabIds)
-  if (!pendingTabIds.has(tabId)) return;
-  pendingTabIds.delete(tabId);
-
-  // 先清理已关闭的 tab（检查上一个 redirect 目标是否仍存在）
-  await cleanupClosedTabs();
-
-  // 读取配置
-  const stored = await chrome.storage.local.get('quickURLs');
-  const items = stored.quickURLs;
-  if (!items || items.length === 0) return; // 无配置，保持 dashboard
-
-  // 动态计算未完成一轮的 URLs
-  const unopened = items.filter(item => !sessionState.openedIDs.includes(item.id));
-  if (unopened.length === 0) return; // 所有 URL 都已打开过 → 保持 dashboard
-
-  // redirect 到第一个未打开的 URL
-  const target = unopened[0];
-  sessionState.openedIDs.push(target.id);
-  sessionState.lastTargetURL = target.url;
-
-  await redirectTab(tabId, target.url);
+  console.log('[tab-out] redirecting tab', tab.id, 'to:', target.url);
+  try {
+    await chrome.tabs.update(tab.id, { url: target.url });
+    console.log('[tab-out] redirect SUCCESS');
+  } catch (err) {
+    console.error('[tab-out] redirect FAILED:', err);
+  }
 });

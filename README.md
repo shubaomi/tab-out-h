@@ -30,6 +30,7 @@ The agent will walk you through it. Takes about 1 minute.
 - **Save for later** bookmark tabs to a checklist before closing them
 - **Localhost grouping** shows port numbers next to each tab so you can tell your vibe coding projects apart
 - **Expandable groups** show the first 8 tabs with a clickable "+N more"
+- **Quick URLs** configure a list of URLs that cycle through on each new tab — first unopened URL gets redirected to automatically; close a tab and it re-enters the rotation on next new tab
 - **100% local** your data never leaves your machine
 - **Pure Chrome extension** no server, no Node.js, no npm, no setup beyond loading the extension
 
@@ -60,11 +61,14 @@ You'll see Tab Out.
 
 ```
 You open a new tab
+  -> If Quick URLs are configured, redirect to the first unopened one
+     (if all are already open, show the dashboard instead)
   -> Tab Out shows your open tabs grouped by domain
   -> Homepages (Gmail, X, etc.) get their own group at the top
   -> Click any tab title to jump to it
   -> Close groups you're done with (swoosh + confetti)
   -> Save tabs for later before closing them
+  -> Close a Quick URL tab → it re-enters the rotation automatically
 ```
 
 Everything runs inside the Chrome extension. No external server, no API calls, no data sent anywhere. Saved tabs are stored in `chrome.storage.local`.
