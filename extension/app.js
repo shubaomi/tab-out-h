@@ -1166,6 +1166,9 @@ async function renderStaticDashboard() {
 
   // --- Render "Saved for Later" column ---
   await renderDeferredColumn();
+
+  // --- Render Quick URLs config panel ---
+  await renderQuickURLsPanel();
 }
 
 async function renderDashboard() {
@@ -1475,6 +1478,337 @@ document.addEventListener('input', async (e) => {
   }
 });
 
+
+/* ================================================================
+   QUICK URLS — Configuration Panel
+   ================================================================ */
+
+// Storage key
+const QUICK_URLS_KEY = 'quickURLs';
+
+/**
+ * getQuickURLs()
+ * 从 chrome.storage.local 读取已配置的 URLs
+ */
+async function getQuickURLs() {
+  const result = await chrome.storage.local.get(QUICK_URLS_KEY);
+  return result[QUICK_URLS_KEY] || [];
+}
+
+/**
+ * saveQuickURLs(items)
+ * 保存 URLs 列表到 chrome.storage.local
+ * @param {Array} items
+ */
+async function saveQuickURLs(items) {
+  await chrome.storage.local.set({ [QUICK_URLS_KEY]: items });
+}
+
+/**
+ * generateQuickURLItem(url, title)
+ * 根据 URL 和 title 生成一个标准化配置项
+ */
+function generateQuickURLItem(url, title) {
+  let hostname = '';
+  try { hostname = new URL(url).hostname; } catch {}
+  return {
+    id: Date.now().toString() + Math.random().toString(36).slice(2),
+    url,
+    title: title || url,
+    hostname,
+    favicon: hostname ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=32` : ''
+  };
+}
+
+/**
+ * addQuickURL(url, title)
+ * 添加一个 URL 到配置列表（插入到最前面）
+ */
+async function addQuickURL(url, title) {
+  const items = await getQuickURLs();
+  if (items.some(item => item.url === url)) return false;
+  const newItem = generateQuickURLItem(url, title);
+  items.unshift(newItem);
+  await saveQuickURLs(items);
+  return newItem;
+}
+
+/**
+ * removeQuickURL(id)
+ * 从配置列表中删除指定 id 的 URL
+ */
+async function removeQuickURL(id) {
+  const items = await getQuickURLs();
+  const filtered = items.filter(item => item.id !== id);
+  await saveQuickURLs(filtered);
+}
+
+/**
+ * reorderQuickURLs(fromIndex, toIndex)
+ * 移动 URL 从一个位置到另一个位置
+ */
+async function reorderQuickURLs(fromIndex, toIndex) {
+  const items = await getQuickURLs();
+  const [moved] = items.splice(fromIndex, 1);
+  items.splice(toIndex, 0, moved);
+  await saveQuickURLs(items);
+}
+
+/**
+ * renderQuickURLsPanel()
+ * 渲染快捷网址配置面板（顶部可折叠区）
+ * 读取配置，刷新面板状态
+ */
+async function renderQuickURLsPanel() {
+  const panel = document.getElementById('quicksUrlsPanel');
+  const countEl = document.getElementById('quicksCount');
+  const listEl = document.getElementById('quicksUrlsList');
+  const emptyEl = document.getElementById('quicksUrlsEmpty');
+  const expandBtn = document.getElementById('quicksExpandBtn');
+
+  if (!panel) return;
+
+  const items = await getQuickURLs();
+
+  if (items.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.style.display = 'block';
+  countEl.textContent = `(${items.length})`;
+
+  if (items.length > 0) {
+    listEl.innerHTML = items.map(item => renderQuickURLCard(item)).join('');
+    listEl.style.display = 'flex';
+    emptyEl.style.display = 'none';
+  } else {
+    listEl.style.display = 'none';
+    emptyEl.style.display = 'block';
+  }
+
+  if (expandBtn) {
+    expandBtn.textContent = panel.classList.contains('expanded') ? '收起' : '展开';
+  }
+}
+
+/**
+ * renderQuickURLCard(item)
+ * 渲染单个 URL 卡片
+ */
+function renderQuickURLCard(item) {
+  const safeUrl = (item.url || '').replace(/"/g, '&quot;');
+  const safeTitle = (item.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return `
+    <div class="quicks-url-card" data-id="${item.id}" data-url="${safeUrl}">
+      <span class="drag-handle" title="拖动排序">⠿</span>
+      <img class="favicon" src="${item.favicon}" alt="" onerror="this.style.display='none'">
+      <div class="url-info">
+        <div class="url-title">${safeTitle}</div>
+        <div class="url-hostname">${item.hostname}</div>
+      </div>
+      <span class="url-badge">${item.hostname}</span>
+      <button class="url-delete-btn" data-action="quicks-delete" data-id="${item.id}" title="删除">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>`;
+}
+
+/**
+ * openTabSelectorModal()
+ * 打开 Tab 选择弹窗，列出所有可添加的 tabs
+ */
+async function openTabSelectorModal() {
+  const modal = document.getElementById('quicksTabModal');
+  const listEl = document.getElementById('quicksTabList');
+  const searchInput = document.getElementById('quicksTabSearchInput');
+
+  if (!modal) return;
+
+  const allTabs = await chrome.tabs.query({});
+  const selectableTabs = allTabs.filter(t => {
+    const url = t.url || '';
+    return !url.startsWith('chrome://') &&
+           !url.startsWith('chrome-extension://') &&
+           !url.startsWith('about:') &&
+           !url.startsWith('file://');
+  });
+
+  window._quicksSelectableTabs = selectableTabs;
+
+  function renderTabs(tabs) {
+    listEl.innerHTML = tabs.map(tab => {
+      let hostname = '';
+      try { hostname = new URL(tab.url).hostname; } catch {}
+      const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+      const safeTitle = (tab.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const safeUrl = (tab.url || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return `
+        <div class="quicks-tab-item" data-url="${safeUrl}" data-title="${safeTitle}">
+          <img class="tab-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">
+          <div class="tab-info">
+            <div class="tab-title">${safeTitle}</div>
+            <div class="tab-url">${safeUrl}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  renderTabs(selectableTabs);
+  searchInput.value = '';
+  modal.style.display = 'flex';
+  setTimeout(() => searchInput.focus(), 50);
+}
+
+/**
+ * closeTabSelectorModal()
+ */
+function closeTabSelectorModal() {
+  const modal = document.getElementById('quicksTabModal');
+  if (modal) modal.style.display = 'none';
+  window._quicksSelectableTabs = null;
+}
+
+/* ================================================================
+   QUICK URLS — Event Bindings
+   ================================================================ */
+
+document.addEventListener('click', async (e) => {
+  const toggle = e.target.closest('#quicksUrlsToggle');
+  const expandBtn = e.target.closest('#quicksExpandBtn');
+
+  if (toggle || expandBtn) {
+    const panel = document.getElementById('quicksUrlsPanel');
+    const body = document.getElementById('quicksUrlsBody');
+    const expandBtnEl = document.getElementById('quicksExpandBtn');
+    panel.classList.toggle('expanded');
+
+    if (panel.classList.contains('expanded')) {
+      body.style.maxHeight = '600px';
+      if (expandBtnEl) expandBtnEl.textContent = '收起';
+    } else {
+      body.style.maxHeight = '0';
+      if (expandBtnEl) expandBtnEl.textContent = '展开';
+    }
+    return;
+  }
+
+  if (e.target.closest('#quicksAddTabBtn')) {
+    await openTabSelectorModal();
+    return;
+  }
+
+  if (e.target.closest('#quicksTabModalClose') || e.target.closest('#quicksTabModalBackdrop')) {
+    closeTabSelectorModal();
+    return;
+  }
+
+  const tabItem = e.target.closest('.quicks-tab-item');
+  if (tabItem && tabItem.dataset.url) {
+    await addQuickURL(tabItem.dataset.url, tabItem.dataset.title);
+    closeTabSelectorModal();
+    await renderQuickURLsPanel();
+    return;
+  }
+
+  const deleteBtn = e.target.closest('[data-action="quicks-delete"]');
+  if (deleteBtn) {
+    const id = deleteBtn.dataset.id;
+    await removeQuickURL(id);
+    await renderQuickURLsPanel();
+    return;
+  }
+
+  const urlCard = e.target.closest('.quicks-url-card');
+  if (urlCard && !e.target.closest('.url-delete-btn') && !e.target.closest('.drag-handle')) {
+    const url = urlCard.dataset.url;
+    if (url) chrome.tabs.create({ url });
+    return;
+  }
+});
+
+// Tab search filtering
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'quicksTabSearchInput') return;
+  const q = e.target.value.trim().toLowerCase();
+  const listEl = document.getElementById('quicksTabList');
+  const tabs = window._quicksSelectableTabs || [];
+  const filtered = tabs.filter(tab =>
+    (tab.title || '').toLowerCase().includes(q) ||
+    (tab.url || '').toLowerCase().includes(q)
+  );
+  listEl.innerHTML = filtered.map(tab => {
+    let hostname = '';
+    try { hostname = new URL(tab.url).hostname; } catch {}
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+    const safeTitle = (tab.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const safeUrl = (tab.url || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return `
+      <div class="quicks-tab-item" data-url="${safeUrl}" data-title="${safeTitle}">
+        <img class="tab-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">
+        <div class="tab-info">
+          <div class="tab-title">${safeTitle}</div>
+          <div class="tab-url">${safeUrl}</div>
+        </div>
+      </div>`;
+  }).join('');
+});
+
+// URL input — enter key to add
+document.addEventListener('keydown', async (e) => {
+  if (e.target.id !== 'quicksUrlInput') return;
+  if (e.key !== 'Enter') return;
+  const input = e.target;
+  const url = input.value.trim();
+  if (!url) return;
+  try { new URL(url); } catch {
+    showToast('请输入有效的网址');
+    return;
+  }
+  await addQuickURL(url, url);
+  input.value = '';
+  await renderQuickURLsPanel();
+});
+
+// "添加" button click
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('#quicksUrlAddBtn')) return;
+  const input = document.getElementById('quicksUrlInput');
+  const url = (input?.value || '').trim();
+  if (!url) return;
+  try { new URL(url); } catch {
+    showToast('请输入有效的网址');
+    return;
+  }
+  await addQuickURL(url, url);
+  if (input) input.value = '';
+  await renderQuickURLsPanel();
+});
+
+// Drag-to-reorder
+let dragSrcIndex = null;
+document.addEventListener('mousedown', (e) => {
+  const handle = e.target.closest('.drag-handle');
+  if (!handle) return;
+  const card = handle.closest('.quicks-url-card');
+  if (!card) return;
+  const cards = Array.from(document.querySelectorAll('.quicks-url-card'));
+  dragSrcIndex = cards.indexOf(card);
+});
+document.addEventListener('mouseup', async (e) => {
+  if (dragSrcIndex === null) return;
+  const card = e.target.closest('.quicks-url-card');
+  if (!card) { dragSrcIndex = null; return; }
+  const cards = Array.from(document.querySelectorAll('.quicks-url-card'));
+  const dragDstIndex = cards.indexOf(card);
+  if (dragDstIndex !== dragSrcIndex && dragDstIndex !== -1) {
+    await reorderQuickURLs(dragSrcIndex, dragDstIndex);
+    await renderQuickURLsPanel();
+  }
+  dragSrcIndex = null;
+});
 
 /* ----------------------------------------------------------------
    INITIALIZE
