@@ -45,15 +45,11 @@ function getNextQuickURL(items) {
 
 /**
  * redirectTab(tabId, targetURL)
- * 向指定 tab 注入脚本，执行 window.location.href = targetURL
+ * 直接用 chrome.tabs.update 跳转到目标 URL（比 executeScript 更早生效）
  */
 async function redirectTab(tabId, targetURL) {
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: (url) => { window.location.href = url; },
-      args: [targetURL]
-    });
+    await chrome.tabs.update(tabId, { url: targetURL });
   } catch (err) {
     console.error('[tab-out] redirect failed:', err);
   }
