@@ -13,8 +13,10 @@ No server. No account. No external API calls. Just a Chrome extension.
 Send your coding agent (Claude Code, Codex, etc.) this repo and say **"install this"**:
 
 ```
-https://github.com/zarazhangrui/tab-out
+https://github.com/shubaomi/tab-out-h
 ```
+
+> Based on [tab-out](https://github.com/zarazhangrui/tab-out) by [Zara](https://x.com/zarazhangrui) — extended with Quick URLs cycling feature.
 
 The agent will walk you through it. Takes about 1 minute.
 
@@ -41,8 +43,10 @@ The agent will walk you through it. Takes about 1 minute.
 **1. Clone the repo**
 
 ```bash
-git clone https://github.com/zarazhangrui/tab-out.git
+git clone https://github.com/shubaomi/tab-out-h.git
 ```
+
+> Based on [tab-out](https://github.com/zarazhangrui/tab-out) by [Zara](https://x.com/zarazhangrui).
 
 **2. Load the Chrome extension**
 
@@ -92,4 +96,4 @@ MIT
 
 ---
 
-Built by [Zara](https://x.com/zarazhangrui)
+Extended by [shubaomi](https://x.com/shubaomi) · Based on [Zara](https://x.com/zarazhangrui)'s [tab-out](https://github.com/zarazhangrui/tab-out)
