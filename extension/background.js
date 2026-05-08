@@ -126,14 +126,15 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   const allTabs = await chrome.tabs.query({});
   const openUrls = new Set(allTabs.map(t => normalizeUrl(t.url)));
 
-  // Check if Tab Out dashboard is already open
-  const extId = chrome.runtime.id;
-  const dashboardUrl = `chrome-extension://${extId}/index.html`;
-  const dashboardOpen = [...openUrls].some(url => url === normalizeUrl(dashboardUrl));
+  // Tab Out overrides chrome://newtab/ — check if dashboard is already open
+  // The URL shown in address bar for Tab Out dashboard is chrome://newtab/
+  const dashboardOpen = [...openUrls].some(url => url === 'chrome://newtab');
+
+  console.log('[tab-out] openUrls:', [...openUrls], 'dashboardOpen:', dashboardOpen);
 
   // If dashboard is not yet open, let this new tab show the dashboard
   if (!dashboardOpen) {
-    console.log('[tab-out] dashboard not open yet — show dashboard');
+    console.log('[tab-out] dashboard not open — show dashboard');
     return;
   }
 
