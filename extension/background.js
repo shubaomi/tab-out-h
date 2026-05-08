@@ -122,33 +122,35 @@ function normalizeUrl(url) {
 }
 
 chrome.tabs.onCreated.addListener(async (tab) => {
-  console.log('[tab-out] onCreated, tab.id:', tab.id);
-
   // Query all currently open tabs
   const allTabs = await chrome.tabs.query({});
   const openUrls = new Set(allTabs.map(t => normalizeUrl(t.url)));
-  console.log('[tab-out] openUrls:', [...openUrls]);
 
-  // Read quick URL config
+  // Check if Tab Out dashboard is already open
+  const extId = chrome.runtime.id;
+  const dashboardUrl = `chrome-extension://${extId}/index.html`;
+  const dashboardOpen = [...openUrls].some(url => url === normalizeUrl(dashboardUrl));
+
+  // If dashboard is not yet open, let this new tab show the dashboard
+  if (!dashboardOpen) {
+    console.log('[tab-out] dashboard not open yet — show dashboard');
+    return;
+  }
+
+  // Dashboard is open — redirect to quick URLs as before
   const stored = await chrome.storage.local.get('quickURLs');
   const items = stored.quickURLs;
-  console.log('[tab-out] items:', items ? items.length : 0);
+  if (!items || items.length === 0) return;
 
-  if (!items || items.length === 0) return; // No config — let dashboard load
-
-  // Find the first configured URL that is NOT currently open
-  // Items are ordered — first item = highest priority
   const target = items.find(item => !openUrls.has(normalizeUrl(item.url)));
-
   if (!target) {
-    console.log('[tab-out] all quick URLs already open — show dashboard');
+    console.log('[tab-out] all quick URLs open — show dashboard');
     return;
   }
 
   console.log('[tab-out] redirecting tab', tab.id, 'to:', target.url);
   try {
     await chrome.tabs.update(tab.id, { url: target.url });
-    console.log('[tab-out] redirect SUCCESS');
   } catch (err) {
     console.error('[tab-out] redirect FAILED:', err);
   }
