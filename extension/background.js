@@ -13,6 +13,52 @@
  *   Red    (#b35a5a) → 21+ tabs   (time to cull!)
  */
 
+// ================================================================
+// SESSION STATE — 仅进程内存，浏览器关闭后重置
+// ================================================================
+let sessionState = {
+  openedIDs: [],      // 本 session 已打开过的 quickURL id 列表
+  lastTargetURL: null // 上一次 redirect 目标 URL
+};
+
+/**
+ * isTabOutPage(url)
+ * 判断 URL 是否为 Tab Out 自身的新标签页
+ */
+function isTabOutPage(url) {
+  if (!url) return false;
+  return url === 'chrome://newtab/' ||
+         url.startsWith('chrome-extension://') && url.endsWith('/index.html');
+}
+
+/**
+ * getNextQuickURL(items)
+ * 从配置列表中返回下一个应该打开的 URL
+ * 规则：从 items 中过滤掉已打开的，取第一个；如果全部已打开，返回 null
+ */
+function getNextQuickURL(items) {
+  if (!items || items.length === 0) return null;
+  const unopened = items.filter(item => !sessionState.openedIDs.includes(item.id));
+  if (unopened.length === 0) return null;
+  return unopened[0];
+}
+
+/**
+ * redirectTab(tabId, targetURL)
+ * 向指定 tab 注入脚本，执行 window.location.href = targetURL
+ */
+async function redirectTab(tabId, targetURL) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (url) => { window.location.href = url; },
+      args: [targetURL]
+    });
+  } catch (err) {
+    console.error('[tab-out] redirect failed:', err);
+  }
+}
+
 // ─── Badge updater ────────────────────────────────────────────────────────────
 
 /**
@@ -91,3 +137,53 @@ chrome.tabs.onUpdated.addListener(() => {
 
 // Run once immediately when the service worker first loads
 updateBadge();
+
+// ================================================================
+// NEW TAB INTERCEPTOR
+// ================================================================
+
+/**
+ * 检查上一个 redirect 目标的 tab 是否仍存在
+ * 如果已被用户关闭（tab 不存在），则将其从 openedIDs 移除，使其重新参与循环
+ */
+async function cleanupClosedTabs() {
+  if (!sessionState.lastTargetURL) return;
+
+  const allTabs = await chrome.tabs.query({});
+  const stillOpen = allTabs.some(t => t.url === sessionState.lastTargetURL);
+
+  if (!stillOpen && sessionState.lastTargetURL) {
+    const { items } = await chrome.storage.local.get('quickURLs');
+    if (items) {
+      const matched = items.find(item => item.url === sessionState.lastTargetURL);
+      if (matched) {
+        const idx = sessionState.openedIDs.indexOf(matched.id);
+        if (idx !== -1) sessionState.openedIDs.splice(idx, 1);
+      }
+    }
+  }
+  sessionState.lastTargetURL = null;
+}
+
+chrome.tabs.onCreated.addListener(async (tab) => {
+  // 仅处理 Tab Out 的新标签页（chrome-extension://.../index.html 或 chrome://newtab/）
+  if (!isTabOutPage(tab.url)) return;
+
+  // 先清理已关闭的 tab（检查上一个 redirect 目标是否仍存在）
+  await cleanupClosedTabs();
+
+  // 读取配置
+  const { items } = await chrome.storage.local.get('quickURLs');
+  if (!items || items.length === 0) return; // 无配置，保持 dashboard
+
+  // 动态计算未完成一轮的 URLs
+  const unopened = items.filter(item => !sessionState.openedIDs.includes(item.id));
+  if (unopened.length === 0) return; // 所有 URL 都已打开过 → 保持 dashboard
+
+  // redirect 到第一个未打开的 URL
+  const target = unopened[0];
+  sessionState.openedIDs.push(target.id);
+  sessionState.lastTargetURL = target.url;
+
+  await redirectTab(tab.id, target.url);
+});
