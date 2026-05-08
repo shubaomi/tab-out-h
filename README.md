@@ -96,4 +96,4 @@ MIT
 
 ---
 
-Extended by [shubaomi](https://x.com/shubaomi) · Based on [Zara](https://x.com/zarazhangrui)'s [tab-out](https://github.com/zarazhangrui/tab-out)
+Extended by [shubaomi](https://github.com/shubaomi) · Based on [Zara](https://x.com/zarazhangrui)'s [tab-out](https://github.com/zarazhangrui/tab-out)
