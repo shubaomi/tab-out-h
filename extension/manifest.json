@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Tab Out",
   "version": "1.0.0",
-  "description": "Keep tabs on your tabs. New tab page that groups your open tabs by domain and lets you close them with style.",
+  "description": "Keep tabs on your tabs. New tab page that groups open tabs by domain, supports Quick URLs cycling, and lets you close tabs with style.",
   "permissions": ["tabs", "activeTab", "storage", "scripting", "webNavigation"],
   "chrome_url_overrides": { "newtab": "index.html" },
   "background": { "service_worker": "background.js" },

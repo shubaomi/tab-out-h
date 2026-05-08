@@ -1565,6 +1565,7 @@ async function renderQuickURLsPanel() {
   const listEl = document.getElementById('quicksUrlsList');
   const emptyEl = document.getElementById('quicksUrlsEmpty');
   const expandBtn = document.getElementById('quicksExpandBtn');
+  const hintEl = document.getElementById('quicksUrlsHint');
 
   if (!panel) return;
 
@@ -1578,9 +1579,15 @@ async function renderQuickURLsPanel() {
     listEl.innerHTML = items.map(item => renderQuickURLCard(item)).join('');
     listEl.style.display = 'flex';
     emptyEl.style.display = 'none';
+    if (hintEl) {
+      hintEl.textContent = '第一个新标签打开仪表盘，之后的新标签按顺序打开以下网址';
+    }
   } else {
     listEl.style.display = 'none';
     emptyEl.style.display = 'block';
+    if (hintEl) {
+      hintEl.textContent = '';
+    }
   }
 
   if (expandBtn) {

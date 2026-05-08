@@ -127,16 +127,10 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   const openUrls = new Set(allTabs.map(t => normalizeUrl(t.url)));
 
   // Tab Out overrides chrome://newtab/ — check if dashboard is already open
-  // The URL shown in address bar for Tab Out dashboard is chrome://newtab/
   const dashboardOpen = [...openUrls].some(url => url === 'chrome://newtab');
 
-  console.log('[tab-out] openUrls:', [...openUrls], 'dashboardOpen:', dashboardOpen);
-
   // If dashboard is not yet open, let this new tab show the dashboard
-  if (!dashboardOpen) {
-    console.log('[tab-out] dashboard not open — show dashboard');
-    return;
-  }
+  if (!dashboardOpen) return;
 
   // Dashboard is open — redirect to quick URLs as before
   const stored = await chrome.storage.local.get('quickURLs');
@@ -144,12 +138,8 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   if (!items || items.length === 0) return;
 
   const target = items.find(item => !openUrls.has(normalizeUrl(item.url)));
-  if (!target) {
-    console.log('[tab-out] all quick URLs open — show dashboard');
-    return;
-  }
+  if (!target) return;
 
-  console.log('[tab-out] redirecting tab', tab.id, 'to:', target.url);
   try {
     await chrome.tabs.update(tab.id, { url: target.url });
   } catch (err) {
