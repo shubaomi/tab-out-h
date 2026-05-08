@@ -198,7 +198,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
   // 读取配置
   const { items } = await chrome.storage.local.get('quickURLs');
-  console.log('[tab-out] quickURLs items:', items);
+  console.log('[tab-out] storage result:', { items });
   if (!items || items.length === 0) {
     console.log('[tab-out] no items or empty, returning — show dashboard');
     return; // 无配置，保持 dashboard
