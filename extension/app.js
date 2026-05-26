@@ -26,6 +26,57 @@
 // All open tabs — populated by fetchOpenTabs()
 let openTabs = [];
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
+function safeLinkUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return ['http:', 'https:', 'file:'].includes(parsed.protocol) ? parsed.href : '#';
+  } catch {
+    return '#';
+  }
+}
+
+function getHostname(url) {
+  try { return new URL(url).hostname; }
+  catch { return ''; }
+}
+
+function safeImageUrl(url) {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    return ['http:', 'https:', 'chrome-extension:', 'data:'].includes(parsed.protocol) ? parsed.href : '';
+  } catch {
+    return '';
+  }
+}
+
+function renderFavicon(tabOrItem, className) {
+  const faviconUrl = safeImageUrl(tabOrItem?.favIconUrl);
+  if (faviconUrl) {
+    return `<img class="${className}" src="${escapeAttr(faviconUrl)}" alt="" referrerpolicy="no-referrer">`;
+  }
+  return renderFaviconPlaceholder(tabOrItem?.hostname || getHostname(tabOrItem?.url), className);
+}
+
+function renderFaviconPlaceholder(hostname, className) {
+  if (!hostname) return '';
+  const label = hostname.replace(/^www\./, '').charAt(0).toUpperCase() || '?';
+  return `<span class="${className} favicon-placeholder" aria-hidden="true">${escapeHtml(label)}</span>`;
+}
+
 /**
  * fetchOpenTabs()
  *
@@ -45,6 +96,7 @@ async function fetchOpenTabs() {
       title:    t.title,
       windowId: t.windowId,
       active:   t.active,
+      favIconUrl: t.favIconUrl,
       // Flag Tab Out's own pages so we can detect duplicate new tabs
       isTabOut: t.url === newtabUrl || t.url === 'chrome://newtab/',
     }));
@@ -231,6 +283,7 @@ async function saveTabForLater(tab) {
     id:        Date.now().toString(),
     url:       tab.url,
     title:     tab.title,
+    favIconUrl: safeImageUrl(tab.favIconUrl),
     savedAt:   new Date().toISOString(),
     completed: false,
     dismissed: false,
@@ -763,14 +816,12 @@ function buildOverflowChips(hiddenTabs, urlCounts = {}) {
     const count    = urlCounts[tab.url] || 1;
     const dupeTag  = count > 1 ? ` <span class="chip-dupe-badge">(${count}x)</span>` : '';
     const chipClass = count > 1 ? ' chip-has-dupes' : '';
-    const safeUrl   = (tab.url || '').replace(/"/g, '&quot;');
-    const safeTitle = label.replace(/"/g, '&quot;');
-    let domain = '';
-    try { domain = new URL(tab.url).hostname; } catch {}
-    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : '';
+    const safeUrl   = escapeAttr(tab.url || '');
+    const safeTitle = escapeAttr(label);
+    const favicon = renderFavicon(tab, 'chip-favicon');
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
-      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ''}
-      <span class="chip-text">${label}</span>${dupeTag}
+      ${favicon}
+      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}
       <div class="chip-actions">
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
@@ -844,14 +895,12 @@ function renderDomainCard(group) {
     const count    = urlCounts[tab.url];
     const dupeTag  = count > 1 ? ` <span class="chip-dupe-badge">(${count}x)</span>` : '';
     const chipClass = count > 1 ? ' chip-has-dupes' : '';
-    const safeUrl   = (tab.url || '').replace(/"/g, '&quot;');
-    const safeTitle = label.replace(/"/g, '&quot;');
-    let domain = '';
-    try { domain = new URL(tab.url).hostname; } catch {}
-    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=16` : '';
+    const safeUrl   = escapeAttr(tab.url || '');
+    const safeTitle = escapeAttr(label);
+    const favicon = renderFavicon(tab, 'chip-favicon');
     return `<div class="page-chip clickable${chipClass}" data-action="focus-tab" data-tab-url="${safeUrl}" title="${safeTitle}">
-      ${faviconUrl ? `<img class="chip-favicon" src="${faviconUrl}" alt="">` : ''}
-      <span class="chip-text">${label}</span>${dupeTag}
+      ${favicon}
+      <span class="chip-text">${escapeHtml(label)}</span>${dupeTag}
       <div class="chip-actions">
         <button class="chip-action chip-save" data-action="defer-single-tab" data-tab-url="${safeUrl}" data-tab-title="${safeTitle}" title="Save for later">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" /></svg>
@@ -882,7 +931,7 @@ function renderDomainCard(group) {
       <div class="status-bar"></div>
       <div class="mission-content">
         <div class="mission-top">
-          <span class="mission-name">${isLanding ? 'Homepages' : (group.label || friendlyDomain(group.domain))}</span>
+          <span class="mission-name">${escapeHtml(isLanding ? 'Homepages' : (group.label || friendlyDomain(group.domain)))}</span>
           ${tabBadge}
           ${dupeBadge}
         </div>
@@ -966,22 +1015,24 @@ async function renderDeferredColumn() {
 function renderDeferredItem(item) {
   let domain = '';
   try { domain = new URL(item.url).hostname.replace(/^www\./, ''); } catch {}
-  const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=16`;
   const ago = timeAgo(item.savedAt);
+  const href = escapeAttr(safeLinkUrl(item.url));
+  const title = item.title || item.url;
+  const favicon = renderFavicon({ ...item, hostname: domain }, 'chip-favicon');
 
   return `
-    <div class="deferred-item" data-deferred-id="${item.id}">
-      <input type="checkbox" class="deferred-checkbox" data-action="check-deferred" data-deferred-id="${item.id}">
+    <div class="deferred-item" data-deferred-id="${escapeAttr(item.id)}">
+      <input type="checkbox" class="deferred-checkbox" data-action="check-deferred" data-deferred-id="${escapeAttr(item.id)}">
       <div class="deferred-info">
-        <a href="${item.url}" target="_blank" rel="noopener" class="deferred-title" title="${(item.title || '').replace(/"/g, '&quot;')}">
-          <img src="${faviconUrl}" alt="" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px">${item.title || item.url}
+        <a href="${href}" target="_blank" rel="noopener" class="deferred-title" title="${escapeAttr(title)}">
+          ${favicon}${escapeHtml(title)}
         </a>
         <div class="deferred-meta">
-          <span>${domain}</span>
-          <span>${ago}</span>
+          <span>${escapeHtml(domain)}</span>
+          <span>${escapeHtml(ago)}</span>
         </div>
       </div>
-      <button class="deferred-dismiss" data-action="dismiss-deferred" data-deferred-id="${item.id}" title="Dismiss">
+      <button class="deferred-dismiss" data-action="dismiss-deferred" data-deferred-id="${escapeAttr(item.id)}" title="Dismiss">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
       </button>
     </div>`;
@@ -994,12 +1045,14 @@ function renderDeferredItem(item) {
  */
 function renderArchiveItem(item) {
   const ago = item.completedAt ? timeAgo(item.completedAt) : timeAgo(item.savedAt);
+  const href = escapeAttr(safeLinkUrl(item.url));
+  const title = item.title || item.url;
   return `
     <div class="archive-item">
-      <a href="${item.url}" target="_blank" rel="noopener" class="archive-item-title" title="${(item.title || '').replace(/"/g, '&quot;')}">
-        ${item.title || item.url}
+      <a href="${href}" target="_blank" rel="noopener" class="archive-item-title" title="${escapeAttr(title)}">
+        ${escapeHtml(title)}
       </a>
-      <span class="archive-item-date">${ago}</span>
+      <span class="archive-item-date">${escapeHtml(ago)}</span>
     </div>`;
 }
 
@@ -1276,7 +1329,13 @@ document.addEventListener('click', async (e) => {
 
     // Save to chrome.storage.local
     try {
-      await saveTabForLater({ url: tabUrl, title: tabTitle });
+      const allTabs = await chrome.tabs.query({});
+      const sourceTab = allTabs.find(t => t.url === tabUrl);
+      await saveTabForLater({
+        url: tabUrl,
+        title: tabTitle,
+        favIconUrl: sourceTab?.favIconUrl
+      });
     } catch (err) {
       console.error('[tab-out] Failed to save tab:', err);
       showToast('Failed to save tab');
@@ -1504,6 +1563,24 @@ async function saveQuickURLs(items) {
   await chrome.storage.local.set({ [QUICK_URLS_KEY]: items });
 }
 
+async function hydrateQuickURLFavicons(items) {
+  const missing = items.filter(item => !safeImageUrl(item.favIconUrl));
+  if (missing.length === 0) return items;
+
+  const tabs = await chrome.tabs.query({});
+  let changed = false;
+  const hydrated = items.map(item => {
+    if (safeImageUrl(item.favIconUrl)) return item;
+    const match = tabs.find(tab => tab.url === item.url && safeImageUrl(tab.favIconUrl));
+    if (!match) return item;
+    changed = true;
+    return { ...item, favIconUrl: safeImageUrl(match.favIconUrl) };
+  });
+
+  if (changed) await saveQuickURLs(hydrated);
+  return hydrated;
+}
+
 /**
  * generateQuickURLItem(url, title)
  * 根据 URL 和 title 生成一个标准化配置项
@@ -1516,7 +1593,14 @@ function generateQuickURLItem(url, title) {
     url,
     title: title || url,
     hostname,
-    favicon: hostname ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=32` : ''
+    favIconUrl: ''
+  };
+}
+
+function generateQuickURLItemFromTab(tab) {
+  return {
+    ...generateQuickURLItem(tab.url, tab.title || tab.url),
+    favIconUrl: safeImageUrl(tab.favIconUrl)
   };
 }
 
@@ -1529,6 +1613,16 @@ async function addQuickURL(url, title) {
   if (items.some(item => item.url === url)) return false;
   const newItem = generateQuickURLItem(url, title);
   items.push(newItem); // append to end — first added = first in list = first to open
+  await saveQuickURLs(items);
+  return newItem;
+}
+
+async function addQuickURLFromTab(tab) {
+  if (!tab?.url) return false;
+  const items = await hydrateQuickURLFavicons(await getQuickURLs());
+  if (items.some(item => item.url === tab.url)) return false;
+  const newItem = generateQuickURLItemFromTab(tab);
+  items.push(newItem);
   await saveQuickURLs(items);
   return newItem;
 }
@@ -1552,6 +1646,14 @@ async function reorderQuickURLs(fromIndex, toIndex) {
   const [moved] = items.splice(fromIndex, 1);
   items.splice(toIndex, 0, moved);
   await saveQuickURLs(items);
+}
+
+async function saveQuickURLOrder(ids) {
+  const items = await getQuickURLs();
+  const byId = new Map(items.map(item => [item.id, item]));
+  const ordered = ids.map(id => byId.get(id)).filter(Boolean);
+  const leftovers = items.filter(item => !ids.includes(item.id));
+  await saveQuickURLs([...ordered, ...leftovers]);
 }
 
 /**
@@ -1600,18 +1702,20 @@ async function renderQuickURLsPanel() {
  * 渲染单个 URL 卡片
  */
 function renderQuickURLCard(item) {
-  const safeUrl = (item.url || '').replace(/"/g, '&quot;');
-  const safeTitle = (item.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const safeUrl = escapeAttr(item.url || '');
+  const safeTitle = escapeHtml(item.title || '');
+  const safeHostname = escapeHtml(item.hostname || '');
+    const favicon = renderFavicon(item, 'favicon');
   return `
-    <div class="quicks-url-card" data-id="${item.id}" data-url="${safeUrl}">
-      <span class="drag-handle" title="拖动排序">⠿</span>
-      <img class="favicon" src="${item.favicon}" alt="">
+    <div class="quicks-url-card" data-id="${escapeAttr(item.id)}" data-url="${safeUrl}" draggable="true">
+      <span class="drag-handle" title="Drag to reorder">::</span>
+      ${favicon}
       <div class="url-info">
         <div class="url-title">${safeTitle}</div>
-        <div class="url-hostname">${item.hostname}</div>
+        <div class="url-hostname">${safeHostname}</div>
       </div>
-      <span class="url-badge">${item.hostname}</span>
-      <button class="url-delete-btn" data-action="quicks-delete" data-id="${item.id}" title="删除">
+      <span class="url-badge">${safeHostname}</span>
+      <button class="url-delete-btn" data-action="quicks-delete" data-id="${escapeAttr(item.id)}" title="Delete">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
         </svg>
@@ -1643,14 +1747,13 @@ async function openTabSelectorModal() {
 
   function renderTabs(tabs) {
     listEl.innerHTML = tabs.map(tab => {
-      let hostname = '';
-      try { hostname = new URL(tab.url).hostname; } catch {}
-      const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
-      const safeTitle = (tab.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-      const safeUrl = (tab.url || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const hostname = getHostname(tab.url);
+      const favicon = renderFavicon({ ...tab, hostname }, 'tab-favicon');
+      const safeTitle = escapeHtml(tab.title || '');
+      const safeUrl = escapeHtml(tab.url || '');
       return `
-        <div class="quicks-tab-item" data-url="${safeUrl}" data-title="${safeTitle}">
-          <img class="tab-favicon" src="${faviconUrl}" alt="">
+        <div class="quicks-tab-item" data-url="${escapeAttr(tab.url || '')}" data-title="${escapeAttr(tab.title || '')}">
+          ${favicon}
           <div class="tab-info">
             <div class="tab-title">${safeTitle}</div>
             <div class="tab-url">${safeUrl}</div>
@@ -1712,7 +1815,12 @@ document.addEventListener('click', async (e) => {
 
   const tabItem = e.target.closest('.quicks-tab-item');
   if (tabItem && tabItem.dataset.url) {
-    await addQuickURL(tabItem.dataset.url, tabItem.dataset.title);
+    const sourceTab = (window._quicksSelectableTabs || []).find(tab => tab.url === tabItem.dataset.url);
+    if (sourceTab) {
+      await addQuickURLFromTab(sourceTab);
+    } else {
+      await addQuickURL(tabItem.dataset.url, tabItem.dataset.title);
+    }
     closeTabSelectorModal();
     await renderQuickURLsPanel();
     return;
@@ -1728,6 +1836,7 @@ document.addEventListener('click', async (e) => {
 
   const urlCard = e.target.closest('.quicks-url-card');
   if (urlCard && !e.target.closest('.url-delete-btn') && !e.target.closest('.drag-handle')) {
+    if (isQuickUrlDragging) return;
     const url = urlCard.dataset.url;
     if (url) chrome.tabs.create({ url });
     return;
@@ -1745,14 +1854,13 @@ document.addEventListener('input', (e) => {
     (tab.url || '').toLowerCase().includes(q)
   );
   listEl.innerHTML = filtered.map(tab => {
-    let hostname = '';
-    try { hostname = new URL(tab.url).hostname; } catch {}
-    const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
-    const safeTitle = (tab.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const safeUrl = (tab.url || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const hostname = getHostname(tab.url);
+    const favicon = renderFavicon({ ...tab, hostname }, 'tab-favicon');
+    const safeTitle = escapeHtml(tab.title || '');
+    const safeUrl = escapeHtml(tab.url || '');
     return `
-      <div class="quicks-tab-item" data-url="${safeUrl}" data-title="${safeTitle}">
-        <img class="tab-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none'">
+      <div class="quicks-tab-item" data-url="${escapeAttr(tab.url || '')}" data-title="${escapeAttr(tab.title || '')}">
+        ${favicon}
         <div class="tab-info">
           <div class="tab-title">${safeTitle}</div>
           <div class="tab-url">${safeUrl}</div>
@@ -1768,7 +1876,7 @@ document.addEventListener('keydown', async (e) => {
   const input = e.target;
   const url = input.value.trim();
   if (!url) return;
-  try { new URL(url); } catch {
+  if (safeLinkUrl(url) === '#') {
     showToast('请输入有效的网址');
     return;
   }
@@ -1783,7 +1891,7 @@ document.addEventListener('click', async (e) => {
   const input = document.getElementById('quicksUrlInput');
   const url = (input?.value || '').trim();
   if (!url) return;
-  try { new URL(url); } catch {
+  if (safeLinkUrl(url) === '#') {
     showToast('请输入有效的网址');
     return;
   }
@@ -1793,27 +1901,61 @@ document.addEventListener('click', async (e) => {
 });
 
 // Drag-to-reorder
-let dragSrcIndex = null;
-document.addEventListener('mousedown', (e) => {
-  const handle = e.target.closest('.drag-handle');
-  if (!handle) return;
-  const card = handle.closest('.quicks-url-card');
-  if (!card) return;
-  const cards = Array.from(document.querySelectorAll('.quicks-url-card'));
-  dragSrcIndex = cards.indexOf(card);
-});
-document.addEventListener('mouseup', async (e) => {
-  if (dragSrcIndex === null) return;
+let draggedQuickUrlCard = null;
+let isQuickUrlDragging = false;
+
+document.addEventListener('dragstart', (e) => {
   const card = e.target.closest('.quicks-url-card');
-  if (!card) { dragSrcIndex = null; return; }
-  const cards = Array.from(document.querySelectorAll('.quicks-url-card'));
-  const dragDstIndex = cards.indexOf(card);
-  if (dragDstIndex !== dragSrcIndex && dragDstIndex !== -1) {
-    await reorderQuickURLs(dragSrcIndex, dragDstIndex);
-    await renderQuickURLsPanel();
-  }
-  dragSrcIndex = null;
+  if (!card) return;
+
+  draggedQuickUrlCard = card;
+  isQuickUrlDragging = true;
+  card.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', card.dataset.id || '');
 });
+
+document.addEventListener('dragover', (e) => {
+  const list = e.target.closest('#quicksUrlsList');
+  if (!list || !draggedQuickUrlCard) return;
+  e.preventDefault();
+
+  const afterElement = getQuickUrlDragAfterElement(list, e.clientY);
+  if (!afterElement) {
+    list.appendChild(draggedQuickUrlCard);
+  } else if (afterElement !== draggedQuickUrlCard) {
+    list.insertBefore(draggedQuickUrlCard, afterElement);
+  }
+});
+
+document.addEventListener('drop', async (e) => {
+  const list = e.target.closest('#quicksUrlsList');
+  if (!list || !draggedQuickUrlCard) return;
+  e.preventDefault();
+
+  const orderedIds = Array.from(list.querySelectorAll('.quicks-url-card'))
+    .map(card => card.dataset.id)
+    .filter(Boolean);
+  await saveQuickURLOrder(orderedIds);
+});
+
+document.addEventListener('dragend', () => {
+  if (draggedQuickUrlCard) draggedQuickUrlCard.classList.remove('dragging');
+  draggedQuickUrlCard = null;
+  setTimeout(() => { isQuickUrlDragging = false; }, 0);
+});
+
+function getQuickUrlDragAfterElement(list, y) {
+  const cards = [...list.querySelectorAll('.quicks-url-card:not(.dragging)')];
+  return cards.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset, element: child };
+    }
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+}
 
 /* ----------------------------------------------------------------
    INITIALIZE

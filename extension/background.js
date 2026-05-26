@@ -122,12 +122,18 @@ function normalizeUrl(url) {
 }
 
 chrome.tabs.onCreated.addListener(async (tab) => {
-  // Query all currently open tabs
+  const dashboardUrl = `chrome-extension://${chrome.runtime.id}/index.html`;
+
+  // Query existing tabs, excluding the tab that just opened.
   const allTabs = await chrome.tabs.query({});
-  const openUrls = new Set(allTabs.map(t => normalizeUrl(t.url)));
+  const existingTabs = allTabs.filter(t => t.id !== tab.id);
+  const openUrls = new Set(existingTabs.map(t => normalizeUrl(t.url)));
 
   // Tab Out overrides chrome://newtab/ — check if dashboard is already open
-  const dashboardOpen = [...openUrls].some(url => url === 'chrome://newtab');
+  const dashboardOpen = existingTabs.some(t => {
+    const url = normalizeUrl(t.url);
+    return url === 'chrome://newtab' || url === dashboardUrl;
+  });
 
   // If dashboard is not yet open, let this new tab show the dashboard
   if (!dashboardOpen) return;
