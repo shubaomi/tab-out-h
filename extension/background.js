@@ -121,8 +121,28 @@ function normalizeUrl(url) {
   return url ? url.replace(/\/$/, '') : '';
 }
 
+/**
+ * isBlankNewTab(tab, dashboardUrl)
+ *
+ * True only for blank new tabs (Ctrl+T / new-tab button). Externally
+ * opened tabs carry a real destination URL in pendingUrl/url and are
+ * left alone so we don't hijack login links from other apps.
+ */
+function isBlankNewTab(tab, dashboardUrl) {
+  const target = normalizeUrl(tab.pendingUrl || tab.url || '');
+  return (
+    target === '' ||
+    target === 'about:blank' ||
+    target === 'chrome://newtab' ||
+    target === dashboardUrl
+  );
+}
+
 chrome.tabs.onCreated.addListener(async (tab) => {
   const dashboardUrl = `chrome-extension://${chrome.runtime.id}/index.html`;
+
+  // Only intercept blank new tabs — leave externally-opened links alone
+  if (!isBlankNewTab(tab, dashboardUrl)) return;
 
   // Query existing tabs, excluding the tab that just opened.
   const allTabs = await chrome.tabs.query({});
